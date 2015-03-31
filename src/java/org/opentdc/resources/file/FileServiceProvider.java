@@ -26,7 +26,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
-public class FileImpl implements ServiceProvider {
+public class FileServiceProvider implements ServiceProvider {
 	private static final String SEED_FN = "/seed.json";
 	private static final String DATA_FN = "/data.json";
 	private static File dataF = null;
@@ -50,7 +50,7 @@ public class FileImpl implements ServiceProvider {
 		logger.info("initStorageProvider() initialized");
 	}
 
-	public FileImpl(ServletContext context, boolean makePersistent) {
+	public FileServiceProvider(ServletContext context, boolean makePersistent) {
 		logger.info("> FileImpl()");
 
 		initStorageProvider();
