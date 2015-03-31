@@ -11,19 +11,22 @@ import java.io.Reader;
 import java.io.Writer;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Logger;
 
 import javax.servlet.ServletContext;
 
-import org.opentdc.exception.DuplicateException;
-import org.opentdc.exception.NotFoundException;
 import org.opentdc.resources.ResourceModel;
-import org.opentdc.resources.StorageProvider;
+import org.opentdc.resources.ServiceProvider;
+import org.opentdc.service.exception.DuplicateException;
+import org.opentdc.service.exception.NotFoundException;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
-public class FileImpl extends StorageProvider {
+public class FileImpl implements ServiceProvider {
 	private static final String SEED_FN = "/seed.json";
 	private static final String DATA_FN = "/data.json";
 	private static File dataF = null;
@@ -32,10 +35,25 @@ public class FileImpl extends StorageProvider {
 	// instance variables
 	private boolean isPersistent = true;
 
+	protected static Map<String, ResourceModel> index = null;
+
+	// instance variables
+	protected Logger logger = Logger.getLogger(this.getClass().getName());
+
+	public void initStorageProvider() {
+		logger.info("> initStorageProvider()");
+
+		if (index == null) {
+			index = new HashMap<String, ResourceModel>();
+		}
+
+		logger.info("initStorageProvider() initialized");
+	}
+
 	public FileImpl(ServletContext context, boolean makePersistent) {
 		logger.info("> FileImpl()");
 
-		super.initStorageProvider();
+		initStorageProvider();
 
 		isPersistent = makePersistent;
 		if (dataF == null) {
@@ -149,7 +167,7 @@ public class FileImpl extends StorageProvider {
 				try {
 					dataF.createNewFile();
 				} catch (IOException e) {
-					logger.error("importJson(): IO exception when creating file "
+					logger.severe("importJson(): IO exception when creating file "
 							+ dataF.getName());
 					e.printStackTrace();
 				}
@@ -163,13 +181,13 @@ public class FileImpl extends StorageProvider {
 	private ArrayList<ResourceModel> importJson(File f) throws NotFoundException {
 		logger.info("importJson(" + f.getName() + "): importing ResourcesData");
 		if (!f.exists()) {
-			logger.error("importJson(" + f.getName()
+			logger.severe("importJson(" + f.getName()
 					+ "): file does not exist.");
 			throw new NotFoundException("File " + f.getName()
 					+ " does not exist.");
 		}
 		if (!f.canRead()) {
-			logger.error("importJson(" + f.getName()
+			logger.severe("importJson(" + f.getName()
 					+ "): file is not readable");
 			throw new NotFoundException("File " + f.getName()
 					+ " is not readable.");
@@ -187,7 +205,7 @@ public class FileImpl extends StorageProvider {
 			_resources = _gson.fromJson(_reader, _collectionType);
 			logger.info("importJson(" + f.getName() + "): json data converted");
 		} catch (FileNotFoundException e1) {
-			logger.error("importJson(" + f.getName()
+			logger.severe("importJson(" + f.getName()
 					+ "): file does not exist (2).");
 			e1.printStackTrace();
 		} finally {
@@ -196,7 +214,7 @@ public class FileImpl extends StorageProvider {
 					_reader.close();
 				}
 			} catch (IOException e) {
-				logger.error("importJson(" + f.getName()
+				logger.severe("importJson(" + f.getName()
 						+ "): IOException when closing the reader.");
 				e.printStackTrace();
 			}
@@ -214,14 +232,14 @@ public class FileImpl extends StorageProvider {
 			Gson _gson = new GsonBuilder().create();
 			_gson.toJson(index.values(), _writer);
 		} catch (FileNotFoundException e) {
-			logger.error("exportJson(" + f.getName() + "): file not found.");
+			logger.severe("exportJson(" + f.getName() + "): file not found.");
 			e.printStackTrace();
 		} finally {
 			if (_writer != null) {
 				try {
 					_writer.close();
 				} catch (IOException e) {
-					logger.error("exportJson(" + f.getName()
+					logger.severe("exportJson(" + f.getName()
 							+ "): IOException when closing the reader.");
 					e.printStackTrace();
 				}
