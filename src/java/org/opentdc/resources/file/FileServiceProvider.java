@@ -67,7 +67,12 @@ public class FileServiceProvider implements ServiceProvider {
 	}
 
 	@Override
-	public ArrayList<ResourceModel> listResources() {
+	public ArrayList<ResourceModel> listResources(
+		String queryType,
+		String query,
+		long position,
+		long size
+	) {
 		logger.info("listResources() -> " + countResources() + " values");
 		return new ArrayList<ResourceModel>(index.values());
 	}
@@ -101,15 +106,20 @@ public class FileServiceProvider implements ServiceProvider {
 	}
 
 	@Override
-	public ResourceModel updateResource(ResourceModel resource) throws NotFoundException {
-		// it does not matter whether an object with the same ID already
-		// exists. It is either replaced or created.
-		index.put(resource.getId(), resource);
-		logger.info("updateResource(" + resource + ")");
-		if (isPersistent) {
-			exportJson(dataF);
+	public ResourceModel updateResource(
+		String id,
+		ResourceModel resource
+	) throws NotFoundException {
+		if(index.get(id) == null) {
+			throw new NotFoundException();
+		} else {
+			index.put(resource.getId(), resource);
+			logger.info("updateResource(" + resource + ")");
+			if (isPersistent) {
+				exportJson(dataF);
+			}
+			return resource;
 		}
-		return resource;
 	}
 
 	@Override
