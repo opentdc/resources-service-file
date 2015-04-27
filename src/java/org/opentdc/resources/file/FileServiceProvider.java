@@ -96,17 +96,20 @@ public class FileServiceProvider implements ServiceProvider {
 	) throws DuplicateException {
 		logger.info("createResource(" + resource + ")");
 		String _id = resource.getId();
-		if (_id != null && _id != "" && index.get(resource.getId()) != null) {
-			// object with same ID exists already
-			throw new DuplicateException();
+		if (_id == null || _id == "") {
+			_id = UUID.randomUUID().toString();
+		} else {
+			if (index.get(_id) != null) {
+				// object with same ID exists already
+				throw new DuplicateException();				
+			}
 		}
 		ResourceModel _resource = new ResourceModel(
-			resource.getId() == null ? UUID.randomUUID().toString() : resource.getId(),
-			resource.getXri(),
-			resource.getFirstName(),
-			resource.getLastName()
-		);
-		index.put(_resource.getId(), _resource);
+				resource.getFirstName() + " " + resource.getLastName(),
+				resource.getFirstName(), 
+				resource.getLastName());
+		_resource.setId(_id);
+		index.put(_id, _resource);
 		if (isPersistent) {
 			exportJson(dataF);
 		}
