@@ -37,7 +37,10 @@ import org.opentdc.file.AbstractFileServiceProvider;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
 import org.opentdc.service.exception.DuplicateException;
+import org.opentdc.service.exception.InternalServerErrorException;
 import org.opentdc.service.exception.NotFoundException;
+import org.opentdc.service.exception.ValidationException;
+import org.opentdc.util.PrettyPrinter;
 
 public class FileServiceProvider extends AbstractFileServiceProvider<ResourceModel> implements ServiceProvider {
 
@@ -65,30 +68,37 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 		int position,
 		int size
 	) {
-		logger.info("listResources() -> " + countResources() + " values");
+		logger.info("listResources() -> " + index.size() + " values");
 		return new ArrayList<ResourceModel>(index.values());
 	}
 
 	@Override
 	public ResourceModel createResource(
 		ResourceModel resource
-	) throws DuplicateException {
-		logger.info("createResource(" + resource + ")");
+	) throws DuplicateException, ValidationException {
+		logger.info("createResource(" + PrettyPrinter.prettyPrintAsJSON(resource) + ")");
 		String _id = resource.getId();
 		if (_id == null || _id == "") {
 			_id = UUID.randomUUID().toString();
 		} else {
 			if (index.get(_id) != null) {
 				// object with same ID exists already
-				throw new DuplicateException();				
+				throw new DuplicateException("resource <" + resource.getId() + 
+						"> exists already.");				
+			}
+			else {
+				throw new ValidationException("resource <" + resource.getId() +
+					"> contains an ID generated on the client. This is not allowed.");
 			}
 		}
 		ResourceModel _resource = new ResourceModel(
-				resource.getFirstName() + " " + resource.getLastName(),
+				resource.getName(),
 				resource.getFirstName(), 
-				resource.getLastName());
+				resource.getLastName(),
+				resource.getContactId());
 		_resource.setId(_id);
 		index.put(_id, _resource);
+		logger.info("createResource() -> " + PrettyPrinter.prettyPrintAsJSON(resource));
 		if (isPersistent) {
 			exportJson(index.values());
 		}
@@ -124,27 +134,21 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 	}
 
 	@Override
-	public void deleteResource(String id) throws NotFoundException {
+	public void deleteResource(
+			String id) 
+		throws NotFoundException, InternalServerErrorException {
 		ResourceModel _resource = index.get(id);
-		;
 		if (_resource == null) {
-			throw new NotFoundException("deleteResource(" + id
-					+ "): no such resource was found.");
+			throw new NotFoundException("resource (" + id
+					+ ") was not found.");
 		}
-		index.remove(id);
+		if (index.remove(id) == null) {
+			throw new InternalServerErrorException("resource <" + id
+					+ "> can not be removed, because it does not exist in the index");
+		}
 		logger.info("deleteResource(" + id + ")");
 		if (isPersistent) {
 			exportJson(index.values());
 		}
-	}
-
-	@Override
-	public int countResources() {
-		int _count = -1;
-		if (index != null) {
-			_count = index.values().size();
-		}
-		logger.info("countResources() = " + _count);
-		return _count;
 	}
 }
