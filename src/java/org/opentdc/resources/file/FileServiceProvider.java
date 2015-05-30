@@ -25,6 +25,7 @@ package org.opentdc.resources.file;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
 import org.opentdc.service.exception.DuplicateException;
 import org.opentdc.service.exception.InternalServerErrorException;
+import org.opentdc.service.exception.NotAllowedException;
 import org.opentdc.service.exception.NotFoundException;
 import org.opentdc.service.exception.ValidationException;
 import org.opentdc.util.PrettyPrinter;
@@ -91,22 +93,24 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 					"> contains an ID generated on the client. This is not allowed.");
 			}
 		}
-		ResourceModel _resource = new ResourceModel(
-				resource.getName(),
-				resource.getFirstName(), 
-				resource.getLastName(),
-				resource.getContactId());
-		_resource.setId(_id);
-		index.put(_id, _resource);
+		resource.setId(_id);
+		Date _date = new Date();
+		resource.setCreatedAt(_date);
+		resource.setCreatedBy("DUMMY_USER");
+		resource.setModifiedAt(_date);
+		resource.setModifiedBy("DUMMY_USER");	
+		index.put(_id, resource);
 		logger.info("createResource() -> " + PrettyPrinter.prettyPrintAsJSON(resource));
 		if (isPersistent) {
 			exportJson(index.values());
 		}
-		return _resource;
+		return resource;
 	}
 
 	@Override
-	public ResourceModel readResource(String id) throws NotFoundException {
+	public ResourceModel readResource(
+			String id) 
+			throws NotFoundException {
 		ResourceModel _resource = index.get(id);
 		if (_resource == null) {
 			throw new NotFoundException("no resource with ID <" + id
@@ -120,17 +124,30 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 	public ResourceModel updateResource(
 		String id,
 		ResourceModel resource
-	) throws NotFoundException {
-		if(index.get(id) == null) {
-			throw new NotFoundException();
-		} else {
-			index.put(resource.getId(), resource);
-			logger.info("updateResource(" + resource + ")");
-			if (isPersistent) {
-				exportJson(index.values());
-			}
-			return resource;
+	) throws NotFoundException, NotAllowedException 
+	{
+		ResourceModel _rm = index.get(id);
+		if(_rm == null) {
+			throw new NotFoundException("resource <" + id + "> was not found.");
+		} 
+		if (! _rm.getCreatedAt().equals(resource.getCreatedAt())) {
+			throw new NotAllowedException("resource<" + id + ">: it is not allowed to change createdAt on the client.");
 		}
+		if (!_rm.getCreatedBy().equalsIgnoreCase(resource.getCreatedBy())) {
+			throw new NotAllowedException("resource<" + id + ">: it is not allowed to change createdBy on the client.");
+		}
+		_rm.setName(resource.getName());
+		_rm.setFirstName(resource.getFirstName());
+		_rm.setLastName(resource.getLastName());
+		_rm.setContactId(resource.getContactId());
+		_rm.setModifiedAt(new Date());
+		_rm.setModifiedBy("DUMMY_USER");
+		index.put(id, _rm);
+		logger.info("updateResource(" + id + ") -> " + PrettyPrinter.prettyPrintAsJSON(_rm));
+		if (isPersistent) {
+			exportJson(index.values());
+		}
+		return _rm;
 	}
 
 	@Override
