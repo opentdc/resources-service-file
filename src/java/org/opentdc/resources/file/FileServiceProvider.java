@@ -25,6 +25,7 @@ package org.opentdc.resources.file;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -64,14 +65,23 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 	}
 
 	@Override
-	public ArrayList<ResourceModel> listResources(
-		String queryType,
-		String query,
-		int position,
-		int size
-	) {
-		logger.info("listResources() -> " + index.size() + " values");
-		return new ArrayList<ResourceModel>(index.values());
+	public List<ResourceModel> listResources(
+			String query, 
+			String queryType,
+			int position, 
+			int size) 
+	{
+		ArrayList<ResourceModel> _resources = new ArrayList<ResourceModel>(index.values());
+		Collections.sort(_resources, ResourceModel.ResourceComparator);
+		ArrayList<ResourceModel> _selection = new ArrayList<ResourceModel>();
+		for (int i = 0; i < _resources.size(); i++) {
+			if (i >= position && i < (position + size)) {
+				_selection.add(_resources.get(i));
+			}			
+		}
+		logger.info("listResources(<" + query + ">, <" + queryType + 
+				">, <" + position + ">, <" + size + ">) -> " + _selection.size() + " resources.");
+		return _selection;
 	}
 
 	@Override
