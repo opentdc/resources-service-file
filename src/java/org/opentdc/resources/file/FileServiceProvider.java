@@ -40,7 +40,6 @@ import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
 import org.opentdc.service.exception.DuplicateException;
 import org.opentdc.service.exception.InternalServerErrorException;
-import org.opentdc.service.exception.NotAllowedException;
 import org.opentdc.service.exception.NotFoundException;
 import org.opentdc.service.exception.ValidationException;
 import org.opentdc.util.PrettyPrinter;
@@ -134,17 +133,17 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 	public ResourceModel updateResource(
 		String id,
 		ResourceModel resource
-	) throws NotFoundException, NotAllowedException 
+	) throws NotFoundException, ValidationException 
 	{
 		ResourceModel _rm = index.get(id);
 		if(_rm == null) {
 			throw new NotFoundException("resource <" + id + "> was not found.");
 		} 
 		if (! _rm.getCreatedAt().equals(resource.getCreatedAt())) {
-			throw new NotAllowedException("resource<" + id + ">: it is not allowed to change createdAt on the client.");
+			throw new ValidationException("resource<" + id + ">: it is not allowed to change createdAt on the client.");
 		}
 		if (!_rm.getCreatedBy().equalsIgnoreCase(resource.getCreatedBy())) {
-			throw new NotAllowedException("resource<" + id + ">: it is not allowed to change createdBy on the client.");
+			throw new ValidationException("resource<" + id + ">: it is not allowed to change createdBy on the client.");
 		}
 		_rm.setName(resource.getName());
 		_rm.setFirstName(resource.getFirstName());
