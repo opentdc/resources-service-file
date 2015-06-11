@@ -102,6 +102,22 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 					"> contains an ID generated on the client. This is not allowed.");
 			}
 		}
+		if (resource.getName() == null || resource.getName().length() == 0) {
+			throw new ValidationException("resource <" + resource.getId() +
+					"> must have a valid name.");
+		}
+		if (resource.getFirstName() == null || resource.getFirstName().length() == 0) {
+			throw new ValidationException("resource <" + resource.getId() +
+					"> must have a valid firstName.");
+		}
+		if (resource.getLastName() == null || resource.getLastName().length() == 0) {
+			throw new ValidationException("resource <" + resource.getId() +
+					"> must have a valid lastName.");
+		}
+		if (resource.getContactId() == null || resource.getContactId().length() == 0) {
+			throw new ValidationException("resource <" + resource.getId() +
+					"> must have a valid contactId.");
+		}
 		resource.setId(_id);
 		Date _date = new Date();
 		resource.setCreatedAt(_date);
