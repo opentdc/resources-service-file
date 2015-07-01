@@ -156,10 +156,12 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 			throw new NotFoundException("resource <" + id + "> was not found.");
 		} 
 		if (! _rm.getCreatedAt().equals(resource.getCreatedAt())) {
-			throw new ValidationException("resource<" + id + ">: it is not allowed to change createdAt on the client.");
+			logger.warning("resource<" + id + ">: ignoring createdAt value <" + resource.getCreatedAt().toString() +
+					"> because it was set on the client.");
 		}
 		if (!_rm.getCreatedBy().equalsIgnoreCase(resource.getCreatedBy())) {
-			throw new ValidationException("resource<" + id + ">: it is not allowed to change createdBy on the client.");
+			logger.warning("resource<" + id + ">: ignoring createdBy value <" + resource.getCreatedBy() +
+					"> because it was set on the client.");
 		}
 		_rm.setName(resource.getName());
 		_rm.setFirstName(resource.getFirstName());
