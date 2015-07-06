@@ -121,9 +121,9 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 		resource.setId(_id);
 		Date _date = new Date();
 		resource.setCreatedAt(_date);
-		resource.setCreatedBy("DUMMY_USER");
+		resource.setCreatedBy(getPrincipal());
 		resource.setModifiedAt(_date);
-		resource.setModifiedBy("DUMMY_USER");	
+		resource.setModifiedBy(getPrincipal());	
 		index.put(_id, resource);
 		logger.info("createResource() -> " + PrettyPrinter.prettyPrintAsJSON(resource));
 		if (isPersistent) {
@@ -168,7 +168,7 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 		_rm.setLastName(resource.getLastName());
 		_rm.setContactId(resource.getContactId());
 		_rm.setModifiedAt(new Date());
-		_rm.setModifiedBy("DUMMY_USER");
+		_rm.setModifiedBy(getPrincipal());
 		index.put(id, _rm);
 		logger.info("updateResource(" + id + ") -> " + PrettyPrinter.prettyPrintAsJSON(_rm));
 		if (isPersistent) {
