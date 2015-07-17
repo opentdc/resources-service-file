@@ -35,7 +35,11 @@ import java.util.logging.Logger;
 
 import javax.servlet.ServletContext;
 
+import org.opentdc.addressbooks.ContactModel;
 import org.opentdc.file.AbstractFileServiceProvider;
+import org.opentdc.rates.RatesModel;
+import org.opentdc.resources.RateRefModel;
+import org.opentdc.resources.RatedResource;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ServiceProvider;
 import org.opentdc.service.exception.DuplicateException;
@@ -44,25 +48,39 @@ import org.opentdc.service.exception.NotFoundException;
 import org.opentdc.service.exception.ValidationException;
 import org.opentdc.util.PrettyPrinter;
 
-public class FileServiceProvider extends AbstractFileServiceProvider<ResourceModel> implements ServiceProvider {
-
-	protected static Map<String, ResourceModel> index = new HashMap<String, ResourceModel>();
+/**
+ * File-based (and transient) implementation of ResourcesService.
+ * @author Bruno Kaiser
+ *
+ */
+public class FileServiceProvider extends AbstractFileServiceProvider<RatedResource> implements ServiceProvider {
+	protected static Map<String, RatedResource> index = new HashMap<String, RatedResource>();
+	protected static Map<String, RateRefModel> rateRefIndex = new HashMap<String, RateRefModel>();
 	protected static final Logger logger = Logger.getLogger(FileServiceProvider.class.getName());
 
+	/**
+	 * Constructor.
+	 * @param context the servlet context (for config)
+	 * @param prefix the directory name where the seed and data.json reside (typically the classname of the service)
+	 * @throws IOException
+	 */
 	public FileServiceProvider(
 		ServletContext context, 
 		String prefix
 	) throws IOException {
 		super(context, prefix);
 		if (index == null) {
-			index = new HashMap<String, ResourceModel>();
-			List<ResourceModel> _resources = importJson();
-			for (ResourceModel _resource : _resources) {
-				index.put(_resource.getId(), _resource);
+			index = new HashMap<String, RatedResource>();
+			List<RatedResource> _resources = importJson();
+			for (RatedResource _resource : _resources) {
+				index.put(_resource.getModel().getId(), _resource);
 			}
 		}
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#listResources(java.lang.String, java.lang.String, int, int)
+	 */
 	@Override
 	public List<ResourceModel> listResources(
 			String query, 
@@ -70,7 +88,10 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 			int position, 
 			int size) 
 	{
-		ArrayList<ResourceModel> _resources = new ArrayList<ResourceModel>(index.values());
+		ArrayList<ResourceModel> _resources = new ArrayList<ResourceModel>();
+		for (RatedResource _ratedRes : index.values()) {
+			_resources.add(_ratedRes.getModel());
+		}
 		Collections.sort(_resources, ResourceModel.ResourceComparator);
 		ArrayList<ResourceModel> _selection = new ArrayList<ResourceModel>();
 		for (int i = 0; i < _resources.size(); i++) {
@@ -83,6 +104,9 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 		return _selection;
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#createResource(org.opentdc.resources.ResourceModel)
+	 */
 	@Override
 	public ResourceModel createResource(
 		ResourceModel resource
@@ -103,96 +127,286 @@ public class FileServiceProvider extends AbstractFileServiceProvider<ResourceMod
 			}
 		}
 		if (resource.getName() == null || resource.getName().length() == 0) {
-			throw new ValidationException("resource <" + resource.getId() +
+			throw new ValidationException("resource <" + _id +
 					"> must have a valid name.");
 		}
-		if (resource.getFirstName() == null || resource.getFirstName().length() == 0) {
-			throw new ValidationException("resource <" + resource.getId() +
-					"> must have a valid firstName.");
-		}
-		if (resource.getLastName() == null || resource.getLastName().length() == 0) {
-			throw new ValidationException("resource <" + resource.getId() +
-					"> must have a valid lastName.");
-		}
 		if (resource.getContactId() == null || resource.getContactId().length() == 0) {
-			throw new ValidationException("resource <" + resource.getId() +
+			throw new ValidationException("resource <" + _id +
 					"> must have a valid contactId.");
 		}
+		ContactModel _contactModel = getContactModel(resource.getContactId());
+		
+		if (resource.getFirstName() != null && !resource.getFirstName().isEmpty()) {
+			logger.warning("resource <" + _id +  
+					">: firstName is a derived field and will be overwritten.");
+		}
+		resource.setFirstName(_contactModel.getFirstName());
+		
+		if (resource.getLastName() != null && !resource.getLastName().isEmpty()) {
+			logger.warning("resource <" + _id +  
+					">: lastName is a derived field and will be overwritten.");
+		}
+		resource.setLastName(_contactModel.getLastName());
 		resource.setId(_id);
 		Date _date = new Date();
 		resource.setCreatedAt(_date);
 		resource.setCreatedBy(getPrincipal());
 		resource.setModifiedAt(_date);
-		resource.setModifiedBy(getPrincipal());	
-		index.put(_id, resource);
+		resource.setModifiedBy(getPrincipal());
+		RatedResource _ratedRes = new RatedResource();
+		_ratedRes.setModel(resource);
+		index.put(_id, _ratedRes);
 		logger.info("createResource() -> " + PrettyPrinter.prettyPrintAsJSON(resource));
 		if (isPersistent) {
 			exportJson(index.values());
 		}
 		return resource;
 	}
-
-	@Override
-	public ResourceModel readResource(
-			String id) 
-			throws NotFoundException {
-		ResourceModel _resource = index.get(id);
-		if (_resource == null) {
-			throw new NotFoundException("no resource with ID <" + id
-					+ "> was found.");
-		}
-		logger.info("readResource(" + id + ") -> " + _resource);
-		return _resource;
+	
+	private ContactModel getContactModel(
+			String contactId) {
+		return org.opentdc.addressbooks.file.FileServiceProvider.getContactModel(contactId);
 	}
 
+
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#readResource(java.lang.String)
+	 */
+	@Override
+	public ResourceModel readResource(
+			String resourceId) 
+			throws NotFoundException {
+		ResourceModel _resource = readRatedResource(resourceId).getModel();
+		logger.info("readResource(" + resourceId + ") -> " + _resource);
+		return _resource;
+	}
+	
+	/**
+	 * Retrieve the RatedResource based on the resourceId.
+	 * @param resourceId the unique id of the resource
+	 * @return the RatedResource that contains the resource as its model
+	 * @throws NotFoundException if no resource with this id was found
+	 */
+	private RatedResource readRatedResource(
+			String resourceId) 
+					throws NotFoundException 
+	{
+		RatedResource _ratedRes = index.get(resourceId);
+		if (_ratedRes == null) {
+			throw new NotFoundException("no resource with id <" + resourceId + "> was found.");
+		}
+		logger.info("readRatedResource(" + resourceId + ") -> " + PrettyPrinter.prettyPrintAsJSON(_ratedRes));
+		return _ratedRes;
+	}
+	
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#updateResource(java.lang.String, org.opentdc.resources.ResourceModel)
+	 */
 	@Override
 	public ResourceModel updateResource(
-		String id,
+		String resourceId,
 		ResourceModel resource
 	) throws NotFoundException, ValidationException 
 	{
-		ResourceModel _rm = index.get(id);
-		if(_rm == null) {
-			throw new NotFoundException("resource <" + id + "> was not found.");
-		} 
-		if (! _rm.getCreatedAt().equals(resource.getCreatedAt())) {
-			logger.warning("resource<" + id + ">: ignoring createdAt value <" + resource.getCreatedAt().toString() +
+		RatedResource _ratedRes = readRatedResource(resourceId);
+		ResourceModel _resModel = _ratedRes.getModel();
+		if (! _resModel.getCreatedAt().equals(resource.getCreatedAt())) {
+			logger.warning("resource<" + resourceId + ">: ignoring createdAt value <" + resource.getCreatedAt().toString() +
 					"> because it was set on the client.");
 		}
-		if (!_rm.getCreatedBy().equalsIgnoreCase(resource.getCreatedBy())) {
-			logger.warning("resource<" + id + ">: ignoring createdBy value <" + resource.getCreatedBy() +
+		if (!_resModel.getCreatedBy().equalsIgnoreCase(resource.getCreatedBy())) {
+			logger.warning("resource<" + resourceId + ">: ignoring createdBy value <" + resource.getCreatedBy() +
 					"> because it was set on the client.");
 		}
-		_rm.setName(resource.getName());
-		_rm.setFirstName(resource.getFirstName());
-		_rm.setLastName(resource.getLastName());
-		_rm.setContactId(resource.getContactId());
-		_rm.setModifiedAt(new Date());
-		_rm.setModifiedBy(getPrincipal());
-		index.put(id, _rm);
-		logger.info("updateResource(" + id + ") -> " + PrettyPrinter.prettyPrintAsJSON(_rm));
+		_resModel.setName(resource.getName());
+		_resModel.setFirstName(resource.getFirstName());
+		_resModel.setLastName(resource.getLastName());
+		_resModel.setContactId(resource.getContactId());
+		_resModel.setModifiedAt(new Date());
+		_resModel.setModifiedBy(getPrincipal());
+		_ratedRes.setModel(_resModel);
+		index.put(resourceId, _ratedRes);
+		logger.info("updateResource(" + resourceId + ") -> " + PrettyPrinter.prettyPrintAsJSON(_resModel));
 		if (isPersistent) {
 			exportJson(index.values());
 		}
-		return _rm;
+		return _resModel;
 	}
 
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#deleteResource(java.lang.String)
+	 */
 	@Override
 	public void deleteResource(
-			String id) 
+			String resourceId) 
 		throws NotFoundException, InternalServerErrorException {
-		ResourceModel _resource = index.get(id);
-		if (_resource == null) {
-			throw new NotFoundException("resource (" + id
-					+ ") was not found.");
+		RatedResource _ratedRes = readRatedResource(resourceId);
+		// remove all rateRefs of this ratedRes from rateRefIndex
+		for (RateRefModel _rateRef : _ratedRes.getRateRefs()) {
+			if (rateRefIndex.remove(_rateRef.getId()) == null) {
+				throw new InternalServerErrorException("rateRef <" + _rateRef.getId()
+						+ "> can not be removed, because it does not exist in the rateRefIndex");				
+			}
 		}
-		if (index.remove(id) == null) {
-			throw new InternalServerErrorException("resource <" + id
+		if (index.remove(resourceId) == null) {
+			throw new InternalServerErrorException("resource <" + resourceId
 					+ "> can not be removed, because it does not exist in the index");
 		}
-		logger.info("deleteResource(" + id + ")");
+		logger.info("deleteResource(" + resourceId + ") -> OK");
 		if (isPersistent) {
 			exportJson(index.values());
 		}
+	}
+	
+	/************************************** RateRef ************************************/
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#listRateRefs(java.lang.String, java.lang.String, java.lang.String, int, int)
+	 */
+	@Override
+	public List<RateRefModel> listRateRefs(
+			String resourceId, 
+			String queryType,
+			String query, 
+			int position, 
+			int size) {
+		List<RateRefModel> _rates = readRatedResource(resourceId).getRateRefs();
+		Collections.sort(_rates, RateRefModel.RatesRefComparator);
+		
+		ArrayList<RateRefModel> _selection = new ArrayList<RateRefModel>();
+		for (int i = 0; i < _rates.size(); i++) {
+			if (i >= position && i < (position + size)) {
+				_selection.add(_rates.get(i));
+			}
+		}
+		logger.info("listRateRefs(<" + resourceId + ">, <" + queryType + ">, <" + query + 
+				">, <" + position + ">, <" + size + ">) -> " + _selection.size()
+				+ " values");
+		return _selection;
+	} 
+	
+	private RatesModel getRatesModel(
+			String rateId) {
+		return org.opentdc.rates.file.FileServiceProvider.getRatesModel(rateId);
+		/*
+		 * better solution would be by calling the service:
+		// check that the rateId is valid and derive the title
+		WebClient _webClient = ServiceUtil.createWebClient(ServiceUtil.RATES_API_URL, RatesService.class);
+		_webClient.type(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON);
+		Response _response = _webClient.replacePath("/").path(rateId).get();
+		int _status = _response.getStatus();
+		if (_status != Status.OK.getStatusCode()) {
+			if (_status == Status.NOT_FOUND.getStatusCode()) {
+				throw new ValidationException("referenced rate <" + 
+						rateId + "> does not exist; please create it first.");				
+			} else {
+				throw new ValidationException("Call to RatesService returned with HTTP status " + _status);
+			}
+		}
+		//see http://stackoverflow.com/questions/23656538/nosuchmethoderror-with-cxf-response-object
+		RatesModel _model = null;
+		if (_response instanceof org.apache.cxf.jaxrs.impl.ResponseImpl) {
+			_model = ((org.apache.cxf.jaxrs.impl.ResponseImpl) _response).readEntity(RatesModel.class);
+		} else {
+			_model = _response.readEntity(RatesModel.class);
+		}
+		return _model;
+		*/
+	}
+	
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#createRateRef(java.lang.String, org.opentdc.resources.RateRefModel)
+	 */
+	@Override
+	public RateRefModel createRateRef(
+			String resourceId, 
+			RateRefModel rateRef)
+			throws DuplicateException, ValidationException 
+	{
+		RatedResource _ratedRes = readRatedResource(resourceId);
+		if (rateRef.getRateId() == null || rateRef.getRateId().isEmpty()) {
+			throw new ValidationException("RateRefModel <" + resourceId + "> must contain a valid rateId.");
+		}
+		if (rateRef.getRateTitle() != null && !rateRef.getRateTitle().isEmpty()) {
+			logger.warning("RateRefModel <" + resourceId +  
+					">: title is a derived field and will be overwritten.");
+		}
+		rateRef.setRateTitle(getRatesModel(rateRef.getRateId()).getTitle());
+		
+		String _id = rateRef.getId();
+		if (_id == null || _id.isEmpty()) {
+			_id = UUID.randomUUID().toString();
+		} else {
+			if (rateRefIndex.get(_id) != null) {
+				throw new DuplicateException("RateRef with id <" + _id + 
+						"> exists already in rateRefIndex.");
+			}
+			else {
+				throw new ValidationException("RateRef with id <" + _id +
+						"> contains an ID generated on the client. This is not allowed.");
+			}
+		}
+
+		rateRef.setId(_id);
+		rateRef.setCreatedAt(new Date());
+		rateRef.setCreatedBy(getPrincipal());
+		
+		rateRefIndex.put(_id, rateRef);
+		_ratedRes.addRateRef(rateRef);
+		
+		logger.info("createRateRef(" + resourceId + ") -> " + PrettyPrinter.prettyPrintAsJSON(rateRef));
+		if (isPersistent) {
+			exportJson(index.values());
+		}
+		return rateRef;
+	}
+
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#readRateRef(java.lang.String, java.lang.String)
+	 */
+	@Override
+	public RateRefModel readRateRef(
+			String resourceId, 
+			String rateRefId)
+			throws NotFoundException {
+		readRatedResource(resourceId);		// verify that the resource exists
+		RateRefModel _rateRef = rateRefIndex.get(rateRefId);
+		if (_rateRef == null) {
+			throw new NotFoundException("RateRef <" + resourceId + "/rateref/" + rateRefId +
+					"> was not found.");
+		}
+		logger.info("readRateRef(" + resourceId + ", " + rateRefId + ") -> "
+				+ PrettyPrinter.prettyPrintAsJSON(_rateRef));
+		return _rateRef;
+	}
+
+	/* (non-Javadoc)
+	 * @see org.opentdc.resources.ServiceProvider#deleteRateRef(java.lang.String, java.lang.String)
+	 */
+	@Override
+	public void deleteRateRef(
+			String resourceId, 
+			String rateRefId)
+			throws NotFoundException, InternalServerErrorException {
+		RatedResource _ratedRes = readRatedResource(resourceId);
+		RateRefModel _rateRef = rateRefIndex.get(rateRefId);
+		if (_rateRef == null) {
+			throw new NotFoundException("RateRef <" + resourceId + "/rateref/" + rateRefId +
+					"> was not found.");
+		}
+		
+		// 1) remove the RateRef from its Resource
+		if (_ratedRes.removeRateRef(_rateRef) == false) {
+			throw new InternalServerErrorException("RateRef <" + resourceId + "/rateref/" + rateRefId
+					+ "> can not be removed, because it is an orphan.");
+		}
+		// 2) remove the RateRef from the rateRefIndex
+		if (rateRefIndex.remove(_rateRef.getId()) == null) {
+			throw new InternalServerErrorException("RateRef <" + resourceId + "/rateref/" + rateRefId
+					+ "> can not be removed, because it does not exist in the index.");
+		}	
+		logger.info("deleteRateRef(" + resourceId + ", " + rateRefId + ") -> OK");
+		if (isPersistent) {
+			exportJson(index.values());
+		}		
 	}
 }
