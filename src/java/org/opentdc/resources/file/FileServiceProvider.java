@@ -187,7 +187,7 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 	 * @return the RatedResource that contains the resource as its model
 	 * @throws NotFoundException if no resource with this id was found
 	 */
-	private RatedResource readRatedResource(
+	private static RatedResource readRatedResource(
 			String resourceId) 
 					throws NotFoundException 
 	{
@@ -197,6 +197,12 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 		}
 		logger.info("readRatedResource(" + resourceId + ") -> " + PrettyPrinter.prettyPrintAsJSON(_ratedRes));
 		return _ratedRes;
+	}
+	
+	public static ResourceModel getResourceModel(
+			String resourceId) 
+			throws NotFoundException {
+		return readRatedResource(resourceId).getModel();
 	}
 	
 	/* (non-Javadoc)
@@ -330,6 +336,12 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 			logger.warning("RateRefModel <" + resourceId +  
 					">: title is a derived field and will be overwritten.");
 		}
+		// a rate can be contained as a RateRef within Resource 0 or 1 times
+		if (_ratedRes.containsRate(rateRef.getRateId())) {
+			throw new DuplicateException("RateRef with Rate <" + rateRef.getRateId() + 
+					"> exists already in Resource <" + resourceId + ">.");
+		}
+
 		rateRef.setRateTitle(getRatesModel(rateRef.getRateId()).getTitle());
 		
 		String _id = rateRef.getId();
