@@ -37,7 +37,7 @@ import javax.servlet.ServletContext;
 
 import org.opentdc.addressbooks.ContactModel;
 import org.opentdc.file.AbstractFileServiceProvider;
-import org.opentdc.rates.RatesModel;
+import org.opentdc.rates.RateModel;
 import org.opentdc.resources.RateRefModel;
 import org.opentdc.resources.RatedResource;
 import org.opentdc.resources.ResourceModel;
@@ -290,7 +290,7 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 		return _selection;
 	} 
 	
-	private RatesModel getRatesModel(
+	private RateModel getRatesModel(
 			String rateId) {
 		return org.opentdc.rates.file.FileServiceProvider.getRatesModel(rateId);
 		/*
