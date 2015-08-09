@@ -199,10 +199,16 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 		return _ratedRes;
 	}
 	
+	/**
+	 * Retrieve a ResourceModel by its ID.
+	 * @param id the ID of the resource
+	 * @return the resource found
+	 * @throws NotFoundException if not resource with such an ID was found
+	 */
 	public static ResourceModel getResourceModel(
-			String resourceId) 
+			String id) 
 			throws NotFoundException {
-		return readRatedResource(resourceId).getModel();
+		return readRatedResource(id).getModel();
 	}
 	
 	/* (non-Javadoc)
@@ -210,18 +216,18 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 	 */
 	@Override
 	public ResourceModel updateResource(
-		String resourceId,
+		String id,
 		ResourceModel resource
 	) throws NotFoundException, ValidationException 
 	{
-		RatedResource _ratedRes = readRatedResource(resourceId);
+		RatedResource _ratedRes = readRatedResource(id);
 		ResourceModel _resModel = _ratedRes.getModel();
 		if (! _resModel.getCreatedAt().equals(resource.getCreatedAt())) {
-			logger.warning("resource<" + resourceId + ">: ignoring createdAt value <" + resource.getCreatedAt().toString() +
+			logger.warning("resource<" + id + ">: ignoring createdAt value <" + resource.getCreatedAt().toString() +
 					"> because it was set on the client.");
 		}
 		if (!_resModel.getCreatedBy().equalsIgnoreCase(resource.getCreatedBy())) {
-			logger.warning("resource<" + resourceId + ">: ignoring createdBy value <" + resource.getCreatedBy() +
+			logger.warning("resource<" + id + ">: ignoring createdBy value <" + resource.getCreatedBy() +
 					"> because it was set on the client.");
 		}
 		_resModel.setName(resource.getName());
@@ -231,8 +237,8 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 		_resModel.setModifiedAt(new Date());
 		_resModel.setModifiedBy(getPrincipal());
 		_ratedRes.setModel(_resModel);
-		index.put(resourceId, _ratedRes);
-		logger.info("updateResource(" + resourceId + ") -> " + PrettyPrinter.prettyPrintAsJSON(_resModel));
+		index.put(id, _ratedRes);
+		logger.info("updateResource(" + id + ") -> " + PrettyPrinter.prettyPrintAsJSON(_resModel));
 		if (isPersistent) {
 			exportJson(index.values());
 		}
@@ -244,9 +250,9 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 	 */
 	@Override
 	public void deleteResource(
-			String resourceId) 
+			String id) 
 		throws NotFoundException, InternalServerErrorException {
-		RatedResource _ratedRes = readRatedResource(resourceId);
+		RatedResource _ratedRes = readRatedResource(id);
 		// remove all rateRefs of this ratedRes from rateRefIndex
 		for (RateRefModel _rateRef : _ratedRes.getRateRefs()) {
 			if (rateRefIndex.remove(_rateRef.getId()) == null) {
@@ -254,11 +260,11 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 						+ "> can not be removed, because it does not exist in the rateRefIndex");				
 			}
 		}
-		if (index.remove(resourceId) == null) {
-			throw new InternalServerErrorException("resource <" + resourceId
+		if (index.remove(id) == null) {
+			throw new InternalServerErrorException("resource <" + id
 					+ "> can not be removed, because it does not exist in the index");
 		}
-		logger.info("deleteResource(" + resourceId + ") -> OK");
+		logger.info("deleteResource(" + id + ") -> OK");
 		if (isPersistent) {
 			exportJson(index.values());
 		}
@@ -290,7 +296,12 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 		return _selection;
 	} 
 	
-	private RateModel getRatesModel(
+	/**
+	 * Retrieve a rate by ID
+	 * @param rateId the id of the rate to look for
+	 * @return the rate found
+	 */
+	private RateModel getRateModel(
 			String rateId) {
 		return org.opentdc.rates.file.FileServiceProvider.getRatesModel(rateId);
 		/*
@@ -325,26 +336,26 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 	@Override
 	public RateRefModel createRateRef(
 			String resourceId, 
-			RateRefModel rateRef)
+			RateRefModel model)
 			throws DuplicateException, ValidationException 
 	{
 		RatedResource _ratedRes = readRatedResource(resourceId);
-		if (rateRef.getRateId() == null || rateRef.getRateId().isEmpty()) {
-			throw new ValidationException("RateRefModel <" + resourceId + "> must contain a valid rateId.");
+		if (model.getRateId() == null || model.getRateId().isEmpty()) {
+			throw new ValidationException("RateRef in Resource <" + resourceId + "> must contain a valid rateId.");
 		}
-		if (rateRef.getRateTitle() != null && !rateRef.getRateTitle().isEmpty()) {
-			logger.warning("RateRefModel <" + resourceId +  
+		if (model.getRateTitle() != null && !model.getRateTitle().isEmpty()) {
+			logger.warning("RateRef in Resource <" + resourceId +  
 					">: title is a derived field and will be overwritten.");
 		}
 		// a rate can be contained as a RateRef within Resource 0 or 1 times
-		if (_ratedRes.containsRate(rateRef.getRateId())) {
-			throw new DuplicateException("RateRef with Rate <" + rateRef.getRateId() + 
+		if (_ratedRes.containsRate(model.getRateId())) {
+			throw new DuplicateException("RateRef with Rate <" + model.getRateId() + 
 					"> exists already in Resource <" + resourceId + ">.");
 		}
 
-		rateRef.setRateTitle(getRatesModel(rateRef.getRateId()).getTitle());
+		model.setRateTitle(getRateModel(model.getRateId()).getTitle());
 		
-		String _id = rateRef.getId();
+		String _id = model.getId();
 		if (_id == null || _id.isEmpty()) {
 			_id = UUID.randomUUID().toString();
 		} else {
@@ -358,18 +369,18 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 			}
 		}
 
-		rateRef.setId(_id);
-		rateRef.setCreatedAt(new Date());
-		rateRef.setCreatedBy(getPrincipal());
+		model.setId(_id);
+		model.setCreatedAt(new Date());
+		model.setCreatedBy(getPrincipal());
 		
-		rateRefIndex.put(_id, rateRef);
-		_ratedRes.addRateRef(rateRef);
+		rateRefIndex.put(_id, model);
+		_ratedRes.addRateRef(model);
 		
-		logger.info("createRateRef(" + resourceId + ") -> " + PrettyPrinter.prettyPrintAsJSON(rateRef));
+		logger.info("createRateRef(" + resourceId + ") -> " + PrettyPrinter.prettyPrintAsJSON(model));
 		if (isPersistent) {
 			exportJson(index.values());
 		}
-		return rateRef;
+		return model;
 	}
 
 	/* (non-Javadoc)
