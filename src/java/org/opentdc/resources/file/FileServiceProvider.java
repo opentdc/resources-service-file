@@ -126,6 +126,8 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 					"> contains an ID generated on the client. This is not allowed.");
 			}
 		}
+		resource.setId(_id);
+		
 		if (resource.getName() == null || resource.getName().length() == 0) {
 			throw new ValidationException("resource <" + _id +
 					"> must have a valid name.");
@@ -147,7 +149,6 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 					">: lastName is a derived field and will be overwritten.");
 		}
 		resource.setLastName(_contactModel.getLastName());
-		resource.setId(_id);
 		Date _date = new Date();
 		resource.setCreatedAt(_date);
 		resource.setCreatedBy(getPrincipal());
@@ -230,10 +231,21 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 			logger.warning("resource<" + id + ">: ignoring createdBy value <" + resource.getCreatedBy() +
 					"> because it was set on the client.");
 		}
-		_resModel.setName(resource.getName());
-		_resModel.setFirstName(resource.getFirstName());
-		_resModel.setLastName(resource.getLastName());
+		ContactModel _contactModel = getContactModel(resource.getContactId());
 		_resModel.setContactId(resource.getContactId());
+		
+		if (resource.getFirstName() != null && !resource.getFirstName().isEmpty()) {
+			logger.warning("resource <" + id +  
+					">: firstName is overwritten because it is a derived field.");
+		}
+		_resModel.setFirstName(_contactModel.getFirstName());
+		
+		if (resource.getLastName() != null && !resource.getLastName().isEmpty()) {
+			logger.warning("resource <" + id +  
+					">: lastName is overwritten because it is a derived field.");
+		}
+		_resModel.setLastName(_contactModel.getLastName());
+		_resModel.setName(resource.getName());
 		_resModel.setModifiedAt(new Date());
 		_resModel.setModifiedBy(getPrincipal());
 		_ratedRes.setModel(_resModel);
