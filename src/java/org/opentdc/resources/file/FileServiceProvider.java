@@ -289,8 +289,8 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 	@Override
 	public List<RateRefModel> listRateRefs(
 			String resourceId, 
-			String queryType,
-			String query, 
+			String query,
+			String queryType, 
 			int position, 
 			int size) {
 		List<RateRefModel> _rates = readRatedResource(resourceId).getRateRefs();
