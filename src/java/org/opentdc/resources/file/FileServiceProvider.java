@@ -41,6 +41,7 @@ import org.opentdc.rates.RateModel;
 import org.opentdc.resources.RateRefModel;
 import org.opentdc.resources.RatedResource;
 import org.opentdc.resources.ResourceModel;
+import org.opentdc.resources.ResourceQueryHandler;
 import org.opentdc.resources.ServiceProvider;
 import org.opentdc.service.exception.DuplicateException;
 import org.opentdc.service.exception.InternalServerErrorException;
@@ -88,15 +89,18 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 			int position, 
 			int size) 
 	{
-		ArrayList<ResourceModel> _resources = new ArrayList<ResourceModel>();
+		ArrayList<ResourceModel> _list = new ArrayList<ResourceModel>();
 		for (RatedResource _ratedRes : index.values()) {
-			_resources.add(_ratedRes.getModel());
+			_list.add(_ratedRes.getModel());
 		}
-		Collections.sort(_resources, ResourceModel.ResourceComparator);
+		Collections.sort(_list, ResourceModel.ResourceComparator);
+		ResourceQueryHandler _queryHandler = new ResourceQueryHandler(query);
 		ArrayList<ResourceModel> _selection = new ArrayList<ResourceModel>();
-		for (int i = 0; i < _resources.size(); i++) {
+		for (int i = 0; i < _list.size(); i++) {
 			if (i >= position && i < (position + size)) {
-				_selection.add(_resources.get(i));
+				if (_queryHandler.evaluate(_list.get(i)) == true) {
+					_selection.add(_list.get(i));
+				}
 			}			
 		}
 		logger.info("listResources(<" + query + ">, <" + queryType + 
