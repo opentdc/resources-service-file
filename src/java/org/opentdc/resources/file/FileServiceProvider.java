@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 import javax.servlet.ServletContext;
+import javax.servlet.http.HttpServletRequest;
 
 import org.opentdc.addressbooks.ContactModel;
 import org.opentdc.file.AbstractFileServiceProvider;
@@ -43,6 +44,7 @@ import org.opentdc.resources.RatedResource;
 import org.opentdc.resources.ResourceModel;
 import org.opentdc.resources.ResourceQueryHandler;
 import org.opentdc.resources.ServiceProvider;
+import org.opentdc.service.ServiceUtil;
 import org.opentdc.service.exception.DuplicateException;
 import org.opentdc.service.exception.InternalServerErrorException;
 import org.opentdc.service.exception.NotFoundException;
@@ -113,6 +115,7 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 	 */
 	@Override
 	public ResourceModel createResource(
+		HttpServletRequest request,
 		ResourceModel resource
 	) throws DuplicateException, ValidationException {
 		logger.info("createResource(" + PrettyPrinter.prettyPrintAsJSON(resource) + ")");
@@ -155,9 +158,9 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 		resource.setLastName(_contactModel.getLastName());
 		Date _date = new Date();
 		resource.setCreatedAt(_date);
-		resource.setCreatedBy(getPrincipal());
+		resource.setCreatedBy(ServiceUtil.getPrincipal(request));
 		resource.setModifiedAt(_date);
-		resource.setModifiedBy(getPrincipal());
+		resource.setModifiedBy(ServiceUtil.getPrincipal(request));
 		RatedResource _ratedRes = new RatedResource();
 		_ratedRes.setModel(resource);
 		index.put(_id, _ratedRes);
@@ -221,6 +224,7 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 	 */
 	@Override
 	public ResourceModel updateResource(
+		HttpServletRequest request,
 		String id,
 		ResourceModel resource
 	) throws NotFoundException, ValidationException 
@@ -251,7 +255,7 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 		_resModel.setLastName(_contactModel.getLastName());
 		_resModel.setName(resource.getName());
 		_resModel.setModifiedAt(new Date());
-		_resModel.setModifiedBy(getPrincipal());
+		_resModel.setModifiedBy(ServiceUtil.getPrincipal(request));
 		_ratedRes.setModel(_resModel);
 		index.put(id, _ratedRes);
 		logger.info("updateResource(" + id + ") -> " + PrettyPrinter.prettyPrintAsJSON(_resModel));
@@ -351,6 +355,7 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 	 */
 	@Override
 	public RateRefModel createRateRef(
+			HttpServletRequest request,
 			String resourceId, 
 			RateRefModel model)
 			throws DuplicateException, ValidationException 
@@ -387,7 +392,7 @@ public class FileServiceProvider extends AbstractFileServiceProvider<RatedResour
 
 		model.setId(_id);
 		model.setCreatedAt(new Date());
-		model.setCreatedBy(getPrincipal());
+		model.setCreatedBy(ServiceUtil.getPrincipal(request));
 		
 		rateRefIndex.put(_id, model);
 		_ratedRes.addRateRef(model);
